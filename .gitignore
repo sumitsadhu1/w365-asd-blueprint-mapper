@@ -1,0 +1,20 @@
+# Build artifacts
+test_output/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Development scripts (not for public repo)
+build_v2.py
+_policies_data.js
+acsc_source/
+w365_policies/
+policies/
+scripts/
+*.py
+qa_test.js
+debug_json.py
+
+# Temp files
+/tmp/
+*.tmp
