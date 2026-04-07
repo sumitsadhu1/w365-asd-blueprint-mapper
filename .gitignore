@@ -15,6 +15,11 @@ scripts/
 qa_test.js
 debug_json.py
 
+# Dev/build HTML variants
+ASD_Blueprint_W365_Configurator.html
+existing_policies.json
+.ism_baseline.json
+
 # Temp files
 /tmp/
 *.tmp

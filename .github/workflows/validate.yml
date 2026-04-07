@@ -1,0 +1,98 @@
+name: Validate HTML Tool
+
+on:
+  push:
+    paths:
+      - 'ASD_Blueprint_W365_Configurator.html'
+  pull_request:
+    paths:
+      - 'ASD_Blueprint_W365_Configurator.html'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check file exists and is non-empty
+        run: |
+          test -f ASD_Blueprint_W365_Configurator.html
+          size=$(wc -c < ASD_Blueprint_W365_Configurator.html)
+          echo "File size: $size bytes"
+          test $size -gt 100000
+
+      - name: Validate HTML structure
+        run: |
+          python3 - << 'PYEOF'
+          with open('ASD_Blueprint_W365_Configurator.html', 'r') as f:
+              content = f.read()
+          
+          # Required elements
+          checks = [
+              ('DOCTYPE', '<!DOCTYPE html>' in content),
+              ('charset', 'charset="UTF-8"' in content),
+              ('POLICY_CATALOG', 'const POLICY_CATALOG = [' in content),
+              ('POLICY_CATALOG_end', ']; // END POLICY_CATALOG' in content),
+              ('CartManager', 'const Cart = {' in content),
+              ('ConflictDetector', 'const Conflicts = {' in content),
+              ('JsonGenerator', 'const Generator = {' in content),
+              ('UI_manager', 'const UI = {' in content),
+              ('DOMContentLoaded', 'DOMContentLoaded' in content),
+              ('closing_tags', '</html>' in content and '</body>' in content),
+          ]
+          
+          all_pass = True
+          for name, result in checks:
+              status = 'PASS' if result else 'FAIL'
+              print(f'  [{status}] {name}')
+              if not result:
+                  all_pass = False
+          
+          if not all_pass:
+              raise SystemExit('Validation failed')
+          print('All checks passed')
+          PYEOF
+
+      - name: Validate JSON templates in catalog
+        run: |
+          python3 - << 'PYEOF'
+          import re, json
+
+          with open('ASD_Blueprint_W365_Configurator.html', 'r') as f:
+              content = f.read()
+
+          # Extract script content
+          script_start = content.find('<script>')
+          script_end = content.rfind('</script>')
+          script = content[script_start:script_end]
+
+          # Count policies by deployment method
+          json_count = script.count("deploymentMethod: 'json'")
+          manual_count = script.count("deploymentMethod: 'manual'")
+          highrisk_count = script.count("deploymentMethod: 'highrisk'")
+          total = json_count + manual_count + highrisk_count
+
+          print(f'Policy counts: {json_count} JSON, {manual_count} manual, {highrisk_count} high-risk = {total} total')
+          
+          if total < 25:
+              raise SystemExit(f'Expected at least 25 policies, found {total}')
+          
+          # Check balanced braces/parens
+          opens = script.count('{')
+          closes = script.count('}')
+          if opens != closes:
+              raise SystemExit(f'Unbalanced curly braces: {opens} open, {closes} close')
+          
+          parens_o = script.count('(')
+          parens_c = script.count(')')
+          if parens_o != parens_c:
+              raise SystemExit(f'Unbalanced parentheses: {parens_o} open, {parens_c} close')
+          
+          print('Syntax balance checks passed')
+          PYEOF
+
+      - name: Check no external dependencies
+        run: |
+          # Ensure no external script/style sources (must be self-contained)
+          ! grep -E 'src="http|href="http' ASD_Blueprint_W365_Configurator.html | grep -v '<!-- ' | grep -v 'a href'
+          echo "Self-contained check passed (no external script/style dependencies)"

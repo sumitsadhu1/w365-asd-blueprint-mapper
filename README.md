@@ -2,7 +2,7 @@
 
 An interactive, self-contained tool that maps ASD Essential Eight controls to Microsoft Intune policies for Windows 365 Cloud PCs. Select your target maturity level, review configurations, and download importable JSON policy packages.
 
-**[Open the Tool →](https://sumitsadhu.github.io/w365-asd-blueprint/)**
+**[Open the Tool →](https://sumitsadhu1.github.io/w365-asd-blueprint-mapper/)**
 
 ## Features
 
