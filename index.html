@@ -501,7 +501,7 @@ body{font-family:'Segoe UI',system-ui,Arial,sans-serif;color:var(--txt);line-hei
       <tr><td><b>E6 &mdash; Patch OS</b></td><td>Update rings (28d deferral)</td><td>Update rings (14d critical)</td><td>Update rings (48h critical) + driver patching</td></tr>
       <tr><td><b>E7 &mdash; MFA</b></td><td>MFA required (authenticator app) <span class="badge b-risk" style="font-size:.6em">HR</span></td><td>Phishing-resistant MFA (FIDO2/WHfB) <span class="badge b-risk" style="font-size:.6em">HR</span></td><td>Same</td></tr>
       <tr><td><b>E8 &mdash; Backups</b></td><td>OneDrive KFM + W365 restore</td><td>+ M365 retention + verified restore testing</td><td>+ Preservation Lock</td></tr>
-      <tr><td><b>ISM &mdash; Endpoint Sec.</b></td><td>Defender AV + Firewall + Compliance</td><td>+ Defender EDR full config + BitLocker</td><td>+ TLS enforcement + advanced audit</td></tr>
+      <tr><td><b>ISM &mdash; Endpoint Sec.</b></td><td>Defender AV + Firewall + Compliance</td><td>+ Defender EDR full config + BitLocker (physical only)</td><td>+ TLS enforcement + advanced audit</td></tr>
     </table>
   </div>
 </div></div>
@@ -578,7 +578,7 @@ body{font-family:'Segoe UI',system-ui,Arial,sans-serif;color:var(--txt);line-hei
   <div class="faq-item"><div class="faq-q info" onclick="this.nextElementSibling.classList.toggle('open')">Q: Can I import the generated JSON files directly into Intune?</div><div class="faq-a">A: Yes. Use <b>Devices &rarr; Configuration &rarr; Policies &rarr; Import policy</b>. The JSON files use the Settings Catalog format (<code>@odata.type #microsoft.graph.deviceManagementConfigurationChoiceSettingInstance</code> etc.) which is directly importable.<br><br><b>Important &mdash; Assignment scope matters:</b> After import, assign each policy to the correct group type. Office and macro policies use <b>user-scoped CSPs</b> and should be assigned to <b>Entra ID user groups</b>. All other policies (Windows Hardening, Edge, Defender, ASR, Audit) use <b>device-scoped CSPs</b> and should be assigned to <b>device groups</b> containing your W365 Cloud PCs. Assigning a user-scoped policy to a device group will work but the System account row will show &ldquo;Not applicable&rdquo; in Intune reporting. The Generated Output tab shows the recommended scope for each policy.</div></div>
   <div class="faq-item"><div class="faq-q info" onclick="this.nextElementSibling.classList.toggle('open')">Q: What happens if two policies define the same setting?</div><div class="faq-a">A: Intune reports a &quot;Conflict&quot; state for the affected devices and setting. The behaviour is unpredictable &mdash; Intune does not have a defined winner. The conflict detection engine in this tool prevents selecting policies that would cause this. If you see conflicts, remove one of the conflicting policies from your cart.</div></div>
   <div class="faq-item"><div class="faq-q info" onclick="this.nextElementSibling.classList.toggle('open')">Q: Why are Conditional Access policies marked &quot;High Risk&quot; instead of providing a JSON?</div><div class="faq-a">A: Conditional Access policies use the Microsoft Entra policy engine (not Intune Settings Catalog) and cannot be imported via JSON. More importantly, CA policies that block access (Block Legacy Auth, Require Compliant Device) can lock users out if deployed incorrectly. The tool provides guided deployment steps with warnings and a phased approach instead.</div></div>
-  <div class="faq-item"><div class="faq-q info" onclick="this.nextElementSibling.classList.toggle('open')">Q: Do W365 Cloud PCs count as Intune-compliant devices automatically?</div><div class="faq-a">A: W365 Cloud PCs are Azure AD Joined and Intune-enrolled automatically during provisioning. However, they still need to satisfy your compliance policy requirements (BitLocker, Secure Boot, minimum OS version). W365 Cloud PCs support BitLocker and Secure Boot by default on the standard gallery images.</div></div>
+  <div class="faq-item"><div class="faq-q info" onclick="this.nextElementSibling.classList.toggle('open')">Q: Do W365 Cloud PCs count as Intune-compliant devices automatically?</div><div class="faq-a">A: W365 Cloud PCs are Azure AD Joined and Intune-enrolled automatically during provisioning. However, they still need to satisfy your compliance policy requirements (Secure Boot, minimum OS version, Defender). <b>Important:</b> BitLocker is NOT supported on W365 Cloud PCs — they are virtual machines without physical TPM hardware. The &ldquo;Require BitLocker&rdquo; compliance check uses Device Health Attestation (DHA), which will always fail on Cloud PCs. Microsoft manages data-at-rest encryption at the hypervisor layer for W365. Create a separate compliance policy for Cloud PCs that does not require BitLocker.</div></div>
   <div class="faq-item"><div class="faq-q info" onclick="this.nextElementSibling.classList.toggle('open')">Q: Why does this tool only include the W365 variant of ACSC Windows Hardening?</div><div class="faq-a">A: This tool is designed exclusively for Windows 365 Cloud PCs. The standard ACSC Windows Hardening policy disables Remote Desktop Services, which would make Cloud PCs inaccessible. The W365 variant enables RDP and removes network access restrictions needed for Cloud PC connectivity, while maintaining all other ACSC security settings.</div></div>
   <div class="faq-item"><div class="faq-q info" onclick="this.nextElementSibling.classList.toggle('open')">Q: How do I know which ASR rule is causing a false positive?</div><div class="faq-a">A: Review the ASR report in the Defender portal: <b>security.microsoft.com &rarr; Reports &rarr; Attack surface reduction &rarr; Audit events</b>. Each event shows the rule that triggered, the process that was detected, and the file involved. Add specific exclusions (process or path) for legitimate false positives.</div></div>
   <div class="faq-item"><div class="faq-q info" onclick="this.nextElementSibling.classList.toggle('open')">Q: What Graph API endpoints are used for importing policies?</div><div class="faq-a">A: Two endpoints are used:<br>&bull; Security Baseline: POST to <code>https://graph.microsoft.com/beta/deviceManagement/configurationPolicies</code><br>&bull; ASR Rules: POST to <code>https://graph.microsoft.com/beta/deviceManagement/templates/0e237410-1367-4844-bd7f-15fb0f08943b/createInstance</code><br>Use <a href="https://aka.ms/ge" target="_blank">Graph Explorer</a> to make these requests. You may need to consent to DeviceManagementConfiguration.ReadWrite.All permission.</div></div>
@@ -6608,10 +6608,10 @@ const POLICY_CATALOG = [
     id:"e5-credential-guard",e8:"E5",pillarName:"Restrict Administrative Privileges",name:"Credential Guard",
     ml:["ML3"],method:"manual-guided",
     ismControls:["ISM-1546","ISM-1686"],
-    description:"Enables Windows Credential Guard, which uses virtualization-based security to isolate LSASS and prevent credential theft attacks like Pass-the-Hash.",
-    impact:"NTLM authentication to non-domain resources may break. Saved domain credentials are no longer available. Some VPN clients and RDP configurations may be affected.",
-    risk:"Can break NTLM authentication scenarios, certain VPN clients, and RDP with saved credentials. Test on pilot devices that represent all use cases (VPN, LOB apps, remote access).",
-    prerequisites:["Virtualization-capable hardware (VBS support)","UEFI Secure Boot enabled","Test VPN and remote access scenarios"],
+    description:"Enables Windows Credential Guard, which uses virtualization-based security to isolate LSASS and prevent credential theft attacks like Pass-the-Hash.<br><br><strong>⚠️ W365 Cloud PCs:</strong> Credential Guard relies on nested virtualization (VBS inside a VM). Support depends on the W365 Cloud PC SKU and configuration. Test thoroughly on Cloud PCs before deploying — some W365 configurations may not support Credential Guard or may experience performance impacts.",
+    impact:"NTLM authentication to non-domain resources may break. Saved domain credentials are no longer available. Some VPN clients and RDP configurations may be affected. On W365 Cloud PCs, additional compatibility testing is required due to nested virtualization.",
+    risk:"Can break NTLM authentication scenarios, certain VPN clients, and RDP with saved credentials. On W365 Cloud PCs, Credential Guard requires nested virtualization support which may not be available on all SKUs. Test on pilot devices (including Cloud PCs) that represent all use cases.",
+    prerequisites:["Virtualization-capable hardware (VBS support)","UEFI Secure Boot enabled","Test VPN and remote access scenarios","W365 Cloud PCs: verify nested virtualization support on your Cloud PC SKU before enabling"],
     conflictsWith:[],settingIds:[],
     configValues:[],
     manualSteps:[
@@ -6927,18 +6927,19 @@ const POLICY_CATALOG = [
     id:"ism-compliance-policy",e8:"ISM",pillarName:"Additional ISM Controls",name:"Device Compliance Policy",
     ml:["ML1","ML2","ML3"],method:"manual-guided",
     ismControls:["ISM-0457","ISM-1417"],
-    description:"Creates a device compliance policy requiring BitLocker encryption, Secure Boot, TPM, minimum OS version, and Defender real-time protection. Non-compliant devices are blocked from corporate resources via Conditional Access.",
-    impact:"Devices that don't meet compliance requirements will be marked non-compliant. When combined with CA, non-compliant devices lose access to corporate email, SharePoint, Teams, etc.",
-    risk:"If deployed before devices are compliant (e.g., BitLocker not enabled yet), users will immediately lose access. Deploy compliance policy AFTER ensuring devices meet the requirements. Use a grace period for non-compliance actions.",
-    prerequisites:["BitLocker encryption deployed","Windows 11 22H2+ on all devices","Defender AV running as primary AV"],
+    description:"Creates a device compliance policy requiring Secure Boot, minimum OS version, and Defender real-time protection. Non-compliant devices are blocked from corporate resources via Conditional Access.<br><br><strong>⚠️ W365 Cloud PCs:</strong> Do NOT require BitLocker in this compliance policy for Cloud PCs. The BitLocker compliance check uses Device Health Attestation (DHA), which always fails on Cloud PCs since they lack physical TPM. Create separate compliance policies for physical devices (with BitLocker) and Cloud PCs (without BitLocker).",
+    impact:"Devices that don't meet compliance requirements will be marked non-compliant. When combined with CA, non-compliant devices lose access to corporate email, SharePoint, Teams, etc. W365 Cloud PCs will falsely appear non-compliant if BitLocker is required.",
+    risk:"CRITICAL for W365: If BitLocker is required in this compliance policy, all Cloud PCs will be marked non-compliant and users will lose access. Create separate compliance policies — one for physical devices (with BitLocker) and one for W365 Cloud PCs (without BitLocker). Use a grace period for non-compliance actions.",
+    prerequisites:["BitLocker encryption deployed on physical devices (NOT W365 Cloud PCs)","Windows 11 22H2+ on all devices","Defender AV running as primary AV"],
     conflictsWith:[],settingIds:[],
     manualSteps:[
       "Intune Admin Center > Devices > Compliance > Create policy > Windows 10 and later",
-      "Device Health: Require BitLocker = Require, Require Secure Boot = Require",
+      "⚠️ FOR W365 CLOUD PCs: Create a SEPARATE compliance policy WITHOUT the BitLocker requirement below",
+      "Device Health (physical devices only): Require BitLocker = Require, Require Secure Boot = Require",
       "Device Properties: Minimum OS version = 10.0.22621 (22H2)",
       "System Security: Require Defender real-time protection = Require, Require Defender minimum version = latest",
       "Actions for noncompliance: Mark noncompliant = Immediately, Send email = Day 1, Block access = Day 7 (grace period)",
-      "Assign to all users/devices group"
+      "⚠️ Create TWO compliance policies: (1) For physical devices — include BitLocker requirement, assign to physical device group. (2) For W365 Cloud PCs — exclude BitLocker requirement, assign to Cloud PC device group. Do NOT assign a single policy with BitLocker to all devices."
     ],
     configValues:[]
   },
@@ -7276,7 +7277,7 @@ const POLICY_CATALOG = [
     ml:["ML2","ML3"],method:"high-risk-manual",
     ismControls:["ISM-1898","ISM-1380"],
     description:"Requires administrators to access admin portals from a compliant, Entra-joined device. Enforces the secure admin workstation (PAW) requirement.",
-    impact:"Administrators can only access Azure Portal, Intune, Entra, and M365 Admin Center from a device that meets Intune compliance requirements (BitLocker, Defender, current OS, etc.).",
+    impact:"Administrators can only access Azure Portal, Intune, Entra, and M365 Admin Center from a device that meets Intune compliance requirements (Defender, current OS, etc.). Note: BitLocker compliance should only be required for physical devices, not W365 Cloud PCs.",
     risk:"HIGH: If no admin devices are compliant, administrators will be locked out of admin portals. Ensure PAW/admin devices meet compliance BEFORE enabling this policy.",
     prerequisites:["PAW/admin devices deployed and compliant","Device compliance policy assigned to admin devices","Break-glass accounts excluded"],
     conflictsWith:[],settingIds:[],
@@ -7428,10 +7429,10 @@ const POLICY_CATALOG = [
     id:"e6-driver-firmware",e8:"E6",pillarName:"Patch Operating Systems",name:"Driver and Firmware Update Management",
     ml:["ML3"],method:"manual-guided",
     ismControls:["ISM-1879","ISM-1903","ISM-1904","ISM-1697"],
-    description:"Manages driver and firmware updates through Intune. ML3 requires critical driver/firmware patches within 48 hours and non-critical within 1 month. Supports automatic or manual approval workflows.",
-    impact:"Driver and firmware updates are managed centrally through Intune rather than relying on Windows Update defaults. IT controls which driver updates are approved.",
-    risk:"Driver updates can occasionally cause hardware compatibility issues (display, network, etc.). Use manual approval for OEMs with known driver quality issues.",
-    prerequisites:["Windows 11 devices","Intune-managed devices","OEM supported in Intune driver management"],
+    description:"Manages driver and firmware updates through Intune. ML3 requires critical driver/firmware patches within 48 hours and non-critical within 1 month. Supports automatic or manual approval workflows.<br><br><strong>⚠️ W365 Cloud PCs:</strong> Hypervisor-level firmware and infrastructure driver updates are managed by Microsoft automatically — not through Intune. This policy primarily benefits physical devices with OEM-specific drivers. For Cloud PCs, Intune may manage some OS-level virtual device drivers, but the majority of driver/firmware management is handled outside your control.",
+    impact:"Physical devices: driver and firmware updates are managed centrally through Intune. W365 Cloud PCs: most driver/firmware updates are managed by Microsoft at the infrastructure level — this policy has limited applicability.",
+    risk:"Physical devices: driver updates can occasionally cause hardware compatibility issues (display, network, etc.). Use manual approval for OEMs with known driver quality issues. W365 Cloud PCs: low risk — infrastructure-level updates are managed by Microsoft.",
+    prerequisites:["Windows 11 devices","Intune-managed devices","OEM supported in Intune driver management (physical devices)","W365 Cloud PCs: infrastructure drivers managed by Microsoft — this policy is optional"],
     conflictsWith:[],settingIds:[],
     manualSteps:[
       "Intune Admin Center > Devices > Windows > Driver updates for Windows 10 and later > Create profile",
@@ -7529,10 +7530,10 @@ const POLICY_CATALOG = [
     id:"e7-whfb",e8:"E7",pillarName:"Multi-Factor Authentication",name:"Windows Hello for Business Configuration",
     ml:["ML2","ML3"],method:"manual-guided",
     ismControls:["ISM-1682","ISM-1872"],
-    description:"Configures Windows Hello for Business as a phishing-resistant authentication method using biometrics (face, fingerprint) or PIN bound to the device's TPM. Required for ML2+ phishing-resistant MFA.",
-    impact:"Users are prompted to set up Windows Hello for Business at next sign-in. They choose a PIN and optionally biometrics. Subsequent sign-ins use WHfB instead of passwords.",
-    risk:"Requires TPM 2.0 hardware (standard on Windows 11 devices and W365 Cloud PCs). Some USB cameras may not support facial recognition. Ensure fallback authentication is available during rollout.",
-    prerequisites:["Windows 11 devices with TPM 2.0","Biometric hardware (optional but recommended for ML3)","Entra ID or Hybrid Azure AD joined devices"],
+    description:"Configures Windows Hello for Business as a phishing-resistant authentication method using PIN bound to the device's TPM, or biometrics where supported. Required for ML2+ phishing-resistant MFA.<br><br><strong>⚠️ W365 Cloud PCs:</strong> PIN authentication works natively (bound to vTPM). Biometric authentication (face/fingerprint) only works if: (1) the RDP client device has biometric hardware, (2) the RDP client supports biometric redirection (e.g., Windows App), and (3) RDP redirection policy permits it. Not all connection methods support biometrics — users without compatible clients should use PIN.",
+    impact:"Users are prompted to set up Windows Hello for Business at next sign-in. They choose a PIN and optionally biometrics (physical devices or supported RDP clients only). Subsequent sign-ins use WHfB instead of passwords.",
+    risk:"Requires TPM 2.0 or vTPM (W365 Cloud PCs have vTPM). On Cloud PCs, biometric auth depends entirely on the RDP client device — not the Cloud PC itself. Ensure fallback to PIN is available. Some USB cameras may not support facial recognition on physical devices.",
+    prerequisites:["Windows 11 devices with TPM 2.0 or vTPM (W365)","Biometric hardware on client device (optional — required only for biometric auth on Cloud PCs via RDP redirection)","Entra ID or Hybrid Azure AD joined devices"],
     conflictsWith:[],settingIds:[],
     manualSteps:[
       "Intune Admin Center > Devices > Windows > Enrollment > Windows Hello for Business",
@@ -7690,13 +7691,13 @@ const POLICY_CATALOG = [
 
   // ═══════════ ISM ADDITIONS ═══════════
   {
-    id:"ism-bitlocker",e8:"ISM",pillarName:"Additional ISM Controls",name:"BitLocker Drive Encryption",
+    id:"ism-bitlocker",e8:"ISM",pillarName:"Additional ISM Controls",name:"Data-at-Rest Encryption (Physical Devices Only)",
     ml:["ML1","ML2","ML3"],method:"manual-guided",
     ismControls:["ISM-0457","ISM-1446"],
-    description:"Configures BitLocker drive encryption with AES-256 encryption strength, silent encryption (no user interaction), and automatic key escrow to Microsoft Entra ID. Protects data at rest on lost or stolen devices.",
-    impact:"All device drives are silently encrypted. Recovery keys are stored in Entra ID. Users experience no disruption — encryption happens in the background.",
-    risk:"If key escrow fails and the device needs recovery, data may be inaccessible. Verify key escrow is functioning before relying on it. W365 Cloud PCs have encryption managed by Microsoft.",
-    prerequisites:["TPM 2.0 (required for silent encryption)","Entra ID joined or hybrid joined devices"],
+    description:"Configures BitLocker drive encryption with AES-256 encryption strength, silent encryption (no user interaction), and automatic key escrow to Microsoft Entra ID. Protects data at rest on lost or stolen devices.<br><br><strong>⚠️ W365 Cloud PCs:</strong> BitLocker is NOT supported on Windows 365 Cloud PCs. Cloud PCs are virtual machines without physical TPM hardware — the Intune compliance check for BitLocker uses Device Health Attestation (DHA), which will always fail on Cloud PCs. Microsoft manages encryption at the hypervisor and storage layer for W365. No action is needed for data-at-rest encryption on Cloud PCs. This policy should only be deployed to physical endpoints.",
+    impact:"Physical devices: drives are silently encrypted with recovery keys stored in Entra ID. W365 Cloud PCs: DO NOT APPLY — encryption is managed by Microsoft at the infrastructure level. Applying this policy to Cloud PCs will cause false non-compliance.",
+    risk:"Deploying BitLocker policies to W365 Cloud PCs will cause devices to appear non-compliant even though nothing is wrong. If combined with Conditional Access, users on Cloud PCs could lose access. Only target physical devices with this policy.",
+    prerequisites:["TPM 2.0 (required for silent encryption — physical devices only)","Entra ID joined or hybrid joined devices","NOT applicable to W365 Cloud PCs"],
     conflictsWith:[],settingIds:[],
     manualSteps:[
       "Intune Admin Center > Endpoint security > Disk encryption > Create policy",
@@ -7708,7 +7709,7 @@ const POLICY_CATALOG = [
       "Encryption method for removable data drives: AES-CBC 256-bit",
       "Recovery key rotation: Enabled (rotate after use)",
       "Save recovery information to Azure Active Directory: Yes",
-      "Assign to all managed devices"
+      "⚠️ Assign to a device group containing PHYSICAL DEVICES ONLY — do NOT assign to W365 Cloud PCs (BitLocker will fail and cause false non-compliance)"
     ],
     configValues:[]
   },
@@ -7790,7 +7791,7 @@ E6:{n:'E6 — Patch Operating Systems',d:'Windows and drivers patched via multi-
 E7:{n:'E7 — Multi-Factor Authentication',d:'MFA for all users. ML1: any MFA method. ML2+: phishing-resistant only (FIDO2, WHfB, certificate-based). Block legacy auth.'},
 E8:{n:'E8 — Regular Backups',d:'Data recovery via W365 point-in-time restore, OneDrive KFM, M365 retention policies, Preservation Lock.'},
 W365:{n:'Windows 365 Specific',d:'Cloud PC provisioning, RDP redirections (4 profiles), W365 security baseline, Windows App enforcement.'},
-ISM:{n:'Additional ISM Controls',d:'Supplementary controls: Defender AV, compliance policies, BitLocker, firewall, audit logging, MDE, TLS enforcement.'}
+ISM:{n:'Additional ISM Controls',d:'Supplementary controls: Defender AV, compliance policies, BitLocker (physical devices only \u2014 not supported on W365), firewall, audit logging, MDE, TLS enforcement.'}
 };
 
 const ML_PRESETS={
